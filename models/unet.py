@@ -10,6 +10,9 @@ class UNetDown(nn.Module):
             nn.Conv2d(in_size, out_size, kernel_size=3, padding=1),
             nn.GroupNorm(16, out_size),
             nn.SiLU(),
+            nn.Conv2d(out_size, out_size, kernel_size=3, padding=1),
+            nn.GroupNorm(16, out_size),
+            nn.SiLU(),
             nn.MaxPool2d(2)
           )
 
@@ -23,6 +26,8 @@ class UNetUp(nn.Module):
         self.model = nn.Sequential(
             nn.Upsample(scale_factor=2),
             nn.Conv2d(in_size, out_size, kernel_size=3, padding=1),
+            nn.GroupNorm(16, out_size),
+            nn.Conv2d(out_size, out_size, kernel_size=3, padding=1),
             nn.GroupNorm(16, out_size),
             nn.SiLU()
         )

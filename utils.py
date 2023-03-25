@@ -3,9 +3,10 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from torch.optim.lr_scheduler import StepLR
+import random
 
 
-def train(model, train_loader, val_loader, num_epochs=10, lr=0.0001, logger=None):
+def train(model, train_loader, val_loader, num_epochs=10, lr=0.001, logger=None, with_structure_masks=False):
     cuda = True if torch.cuda.is_available() else False
     print(f"Using cuda device: {cuda}")  # check if GPU is used
 
@@ -15,13 +16,14 @@ def train(model, train_loader, val_loader, num_epochs=10, lr=0.0001, logger=None
     # Loss function
     criterion = torch.nn.L1Loss()
 
+    # Cuda handling
     if cuda:
         model = model.cuda()
         criterion.cuda()
 
     # Optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    scheduler = StepLR(optimizer, step_size=10, gamma=0.1)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    scheduler = StepLR(optimizer, step_size=15, gamma=0.1)
 
     # ----------
     #  Training
@@ -34,6 +36,7 @@ def train(model, train_loader, val_loader, num_epochs=10, lr=0.0001, logger=None
         print('Training')
         model.train()
         for i, batch in tqdm(enumerate(train_loader)):
+            # Get inputs
             ct = batch["ct"].type(Tensor)
             possible_dose_mask = batch["possible_dose_mask"].type(Tensor)
             structure_masks = batch["structure_masks"].type(Tensor)
@@ -43,8 +46,15 @@ def train(model, train_loader, val_loader, num_epochs=10, lr=0.0001, logger=None
             optimizer.zero_grad()
 
             # Generate output
-            x = torch.cat([ct, structure_masks], dim=1)
-            y_pred = model(x, possible_dose_mask)
+            # With structure masks
+            if with_structure_masks:
+                x = torch.cat([ct, structure_masks], dim=1)
+                y_pred = model(x, possible_dose_mask)
+
+            # Without structure mask
+            else:
+                x = ct
+                y_pred = model(x, possible_dose_mask)
 
             # Compute the corresponding loss
             loss = criterion(y_pred, dose)
@@ -59,29 +69,28 @@ def train(model, train_loader, val_loader, num_epochs=10, lr=0.0001, logger=None
         # Validation at end of epoch
         print('Validation')
 
-        # Take one random sample to visualize result
-        rdm_sample = np.random.random_integers(0, len(val_loader))
-
-        with torch.no_grad():
+        with torch.no_grad():  # Validation, no need to store gradients
             for i, batch in tqdm(enumerate(val_loader)):
+                # Get inputs
                 ct = batch["ct"].type(Tensor)
                 possible_dose_mask = batch["possible_dose_mask"].type(Tensor)
                 structure_masks = batch["structure_masks"].type(Tensor)
                 dose = batch["dose"].type(Tensor)
 
                 # Generate output
-                x = torch.cat([ct, structure_masks], dim=1)
-                y_pred = model(x, possible_dose_mask)
+                # With structure masks
+                if with_structure_masks:
+                    x = torch.cat([ct, structure_masks], dim=1)
+                    y_pred = model(x, possible_dose_mask)
+
+                # Without structure mask
+                else:
+                    x = ct
+                    y_pred = model(x, possible_dose_mask)
 
                 # Compute the corresponding loss
                 loss = criterion(y_pred, dose)
                 eval_loss.append(loss.item())
-
-                # if i == rdm_sample:
-                #     pred_to_plot = y_pred[0].cpu().permute(1, 2, 0)  # Take first example in batch
-                #     print(torch.unique(pred_to_plot))
-                #     ct_to_plot = ct[0].cpu().permute(1, 2, 0)
-                #     dose_to_plot = dose[0].cpu().permute(1, 2, 0)
 
         eval_loss = np.mean(eval_loss)
 
@@ -92,14 +101,11 @@ def train(model, train_loader, val_loader, num_epochs=10, lr=0.0001, logger=None
         logger.add_scalar('train_loss', train_loss, epoch)
         logger.add_scalar('eval_loss', eval_loss, epoch)
 
+        # Step for lr_scheduler
         scheduler.step()
 
+        # Save model
         save_checkpoint(model)
-        # fig, axes = plt.subplots(1, 3)
-        # axes[0].imshow(pred_to_plot, cmap='jet')
-        # axes[1].imshow(ct_to_plot, cmap='jet')
-        # axes[2].imshow(dose_to_plot, cmap='jet')
-        # plt.show()
 
     return
 
@@ -107,4 +113,25 @@ def train(model, train_loader, val_loader, num_epochs=10, lr=0.0001, logger=None
 def save_checkpoint(model):
     torch.save(model.state_dict(), 'checkpoints/model.pt')
     return
+
+
+class FixRandomSeed:
+    """
+    This class fixes the seeds for numpy, torch and random pkgs.
+    """
+    def __init__(self, random_seed: int = 0):
+        self.random_seed = random_seed
+        self.randombackup = random.getstate()
+        self.npbackup = np.random.get_state()
+        self.torchbackup = torch.get_rng_state()
+
+    def __enter__(self):
+        np.random.seed(self.random_seed)
+        random.seed(self.random_seed)
+        torch.manual_seed(self.random_seed)
+
+    def __exit__(self, *_):
+        np.random.set_state(self.npbackup)
+        random.setstate(self.randombackup)
+        torch.set_rng_state(self.torchbackup)
 

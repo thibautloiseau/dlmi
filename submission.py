@@ -2,9 +2,12 @@ import torch
 import numpy as np
 from tqdm import tqdm
 import os
+from torch import nn
+import torchvision.transforms as T
 
 from models.unet import UNet
 from data import RadDatasetTest
+from augment import TransformTest
 
 
 def load_model(path):
@@ -13,7 +16,7 @@ def load_model(path):
     return model
 
 
-def create_submission_file(model, dataset, path):
+def create_submission(model, dataset, path):
     # Create path
     if not os.path.exists(path):
         os.makedirs(path)
@@ -36,7 +39,7 @@ def create_submission_file(model, dataset, path):
             x = torch.cat([ct, structure_masks], dim=0).type(Tensor)[None, :]  # Adding first dimension for batch size
 
             # Get prediction
-            y_pred = model(x, possible_dose_mask.type(Tensor)).cpu().numpy().squeeze()
+            y_pred = model(x, possible_dose_mask.type(Tensor)).type(Tensor).cpu().numpy().squeeze()
 
             # Save prediction
             np.save(os.path.join(path, no_sample), y_pred)
@@ -44,10 +47,12 @@ def create_submission_file(model, dataset, path):
 
 if __name__ == '__main__':
     # Loading trained model
-    model = load_model('checkpoints/model.pt')
-    dataset = RadDatasetTest()
-    path = 'submissions/test'
+    model = load_model('important_logs/conv_transpose/model.pt')
 
-    create_submission_file(model, dataset, path)
+    transform_test = TransformTest()
+    dataset = RadDatasetTest(transform=transform_test)
+    path = 'submissions/conv_transpose'
+
+    create_submission(model, dataset, path)
 
 

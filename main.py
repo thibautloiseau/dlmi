@@ -1,13 +1,17 @@
 import os
+
+import torch.hub
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+from torch import nn
 
 from data import RadDataset, RadDatasetTest
 from utils import train
 from models.unet import UNet
-from models.vision_transformer import SwinUnet
+# from models.vision_transformer import SwinUnet
+from augment import Transform
 
 
 if __name__ == '__main__':
@@ -23,27 +27,30 @@ if __name__ == '__main__':
     writer = SummaryWriter(f'logs/run_{new_run}')
 
     # Hyperparameters
-    lr = 0.001
+    lr = 1e-3
     batch_size = 32
-    num_epochs = 50
+    num_epochs = 60
 
     # Data
-    transform = None
+    transform_train = Transform(mode='train')
+    transform_val = Transform(mode='val')
 
-    train_loader = DataLoader(RadDataset('train', transform=transform),
+    train_loader = DataLoader(RadDataset('train', transform=transform_train),
                               batch_size=batch_size,
                               shuffle=True)
-    val_loader = DataLoader(RadDataset('val', transform=transform),
+    val_loader = DataLoader(RadDataset('val', transform=transform_val),
                             batch_size=batch_size,
                             shuffle=False)
-    test_loader = DataLoader(RadDatasetTest(),
-                             batch_size=batch_size,
-                             shuffle=False)
 
-    # # Create model
-    # model = UNet()
-    model = SwinUnet()
+    # Create model
+    # UNet with upsample
+    model = UNet()
+
+    # # Pretrained UNet
+    # model = torch.hub.load('mateuszbuda/brain-segmentation-pytorch', 'unet', in_channels=3, out_channels=1, init_features=32, pretrained=True)
+    #
+    # # Adjusting last layer to finetune
+    # model.conv = nn.Conv2d(32, 1, kernel_size=3, stride=2, padding=1)
 
     # Launch training
-    train(model, train_loader, val_loader, num_epochs=num_epochs, lr=lr, logger=writer)
-
+    train(model, train_loader, val_loader, num_epochs=num_epochs, lr=lr, logger=writer, with_structure_masks=True)

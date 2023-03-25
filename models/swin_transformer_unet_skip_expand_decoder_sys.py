@@ -330,7 +330,6 @@ class PatchMerging(nn.Module):
         flops += (H // 2) * (W // 2) * 4 * self.dim * 2 * self.dim
         return flops
 
-
 class PatchExpand(nn.Module):
     def __init__(self, input_resolution, dim, dim_scale=2, norm_layer=nn.LayerNorm):
         super().__init__()
@@ -354,7 +353,6 @@ class PatchExpand(nn.Module):
         x= self.norm(x)
 
         return x
-
 
 class FinalPatchExpand_X4(nn.Module):
     def __init__(self, input_resolution, dim, dim_scale=4, norm_layer=nn.LayerNorm):
@@ -381,7 +379,6 @@ class FinalPatchExpand_X4(nn.Module):
         x= self.norm(x)
 
         return x
-
 
 class BasicLayer(nn.Module):
     """ A basic Swin Transformer layer for one stage.
@@ -452,7 +449,6 @@ class BasicLayer(nn.Module):
             flops += self.downsample.flops()
         return flops
 
-
 class BasicLayer_up(nn.Module):
     """ A basic Swin Transformer layer for one stage.
 
@@ -510,7 +506,6 @@ class BasicLayer_up(nn.Module):
         if self.upsample is not None:
             x = self.upsample(x)
         return x
-
 
 class PatchEmbed(nn.Module):
     r""" Image to Patch Embedding
@@ -654,18 +649,18 @@ class SwinTransformerSys(nn.Module):
                 patches_resolution[1] // (2 ** (self.num_layers-1-i_layer))), dim=int(embed_dim * 2 ** (self.num_layers-1-i_layer)), dim_scale=2, norm_layer=norm_layer)
             else:
                 layer_up = BasicLayer_up(dim=int(embed_dim * 2 ** (self.num_layers-1-i_layer)),
-                                         input_resolution=(patches_resolution[0] // (2 ** (self.num_layers-1-i_layer)),
-                                         patches_resolution[1] // (2 ** (self.num_layers-1-i_layer))),
-                                         depth=depths[(self.num_layers-1-i_layer)],
-                                         num_heads=num_heads[(self.num_layers-1-i_layer)],
-                                         window_size=window_size,
-                                         mlp_ratio=self.mlp_ratio,
-                                         qkv_bias=qkv_bias, qk_scale=qk_scale,
-                                         drop=drop_rate, attn_drop=attn_drop_rate,
-                                         drop_path=dpr[sum(depths[:(self.num_layers-1-i_layer)]):sum(depths[:(self.num_layers-1-i_layer) + 1])],
-                                         norm_layer=norm_layer,
-                                         upsample=PatchExpand if (i_layer < self.num_layers - 1) else None,
-                                         use_checkpoint=use_checkpoint)
+                                input_resolution=(patches_resolution[0] // (2 ** (self.num_layers-1-i_layer)),
+                                                    patches_resolution[1] // (2 ** (self.num_layers-1-i_layer))),
+                                depth=depths[(self.num_layers-1-i_layer)],
+                                num_heads=num_heads[(self.num_layers-1-i_layer)],
+                                window_size=window_size,
+                                mlp_ratio=self.mlp_ratio,
+                                qkv_bias=qkv_bias, qk_scale=qk_scale,
+                                drop=drop_rate, attn_drop=attn_drop_rate,
+                                drop_path=dpr[sum(depths[:(self.num_layers-1-i_layer)]):sum(depths[:(self.num_layers-1-i_layer) + 1])],
+                                norm_layer=norm_layer,
+                                upsample=PatchExpand if (i_layer < self.num_layers - 1) else None,
+                                use_checkpoint=use_checkpoint)
             self.layers_up.append(layer_up)
             self.concat_back_dim.append(concat_linear)
 
@@ -674,8 +669,8 @@ class SwinTransformerSys(nn.Module):
 
         if self.final_upsample == "expand_first":
             print("---final upsample expand_first---")
-            self.up = FinalPatchExpand_X4(input_resolution=(img_size//patch_size, img_size//patch_size), dim_scale=4, dim=embed_dim)
-            self.output = nn.Conv2d(in_channels=embed_dim, out_channels=self.num_classes, kernel_size=1, bias=False)
+            self.up = FinalPatchExpand_X4(input_resolution=(img_size//patch_size,img_size//patch_size),dim_scale=4,dim=embed_dim)
+            self.output = nn.Conv2d(in_channels=embed_dim,out_channels=self.num_classes,kernel_size=1,bias=False)
 
         self.apply(self._init_weights)
 
